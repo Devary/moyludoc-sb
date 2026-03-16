@@ -1,0 +1,15 @@
+# Maven
+target/
+docs-library/
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+
+# Local environment
+.env

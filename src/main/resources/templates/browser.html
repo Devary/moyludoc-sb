@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moyludoc Library</title>
+  <link rel="stylesheet" href="/browser.css">
+</head>
+<body>
+<div class="app-shell">
+  <div class="app-topbar">
+    <div><h1>Moyludoc Library</h1></div>
+    <div class="viewer-actions">
+      <button id="zoomOutBtn" class="zoom-btn" type="button" disabled aria-label="Zoom out">−</button>
+      <button id="zoomResetBtn" class="zoom-reset" type="button" disabled>100%</button>
+      <button id="zoomInBtn" class="zoom-btn" type="button" disabled aria-label="Zoom in">+</button>
+    </div>
+  </div>
+  <div class="app-layout">
+    <aside class="sidebar-column">
+      <div class="sidebar-card">
+        <div class="sidebar-title">Documents</div>
+        <div class="toolbar-row">
+          <div class="upload-target">Upload to: <span id="uploadTargetPath">Library root</span></div>
+          <label class="upload-btn"><input id="uploadInput" type="file" multiple><span id="uploadLabel">Upload files</span></label>
+        </div>
+        <input id="treeSearch" class="search" type="search" placeholder="Search documents...">
+        <div class="menu-tree" role="tree" aria-label="Documents tree">
+          <ul class="tree-level tree-root">
+            <th:block th:each="node : ${tree.children}">
+              <th:block th:replace="~{treeNode :: treeNode(node=${node})}"></th:block>
+            </th:block>
+          </ul>
+        </div>
+      </div>
+    </aside>
+    <main class="preview-column">
+      <div class="preview-pane">
+        <div class="viewer-header">
+          <div class="viewer-meta">
+            <strong id="currentDoc">No document selected</strong>
+            <span id="breadcrumbs" class="breadcrumbs">—</span>
+          </div>
+          <span id="fileTypeBadge" class="file-type-badge hidden">—</span>
+        </div>
+        <div class="viewer-shell native-preview">
+          <div id="viewerLoading" class="viewer-loading hidden" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="viewer-loading-text">Loading preview…</div>
+            <div class="viewer-loading-subtext">Large files can take a bit longer to extract and render.</div>
+          </div>
+          <div class="viewer-stage"><iframe id="viewer" class="viewer" title="Document preview"></iframe></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <footer class="app-footer">© 2026 Fakher Hammami · <a href="mailto:hfekher@gmail.com">hfekher@gmail.com</a></footer>
+</div>
+<script src="/browser.js"></script>
+</body>
+</html>

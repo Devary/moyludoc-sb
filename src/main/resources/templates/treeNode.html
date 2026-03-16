@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="treeNode(node)">
+  <li class="tree-item" th:if="${node.document}">
+    <a href="#" class="tree-row file-row doc-link" th:classappend="${node.empty} ? ' empty-file' : ''" th:attr="data-id=${node.id},data-name=${node.name},data-relative-path=${node.relativePath},data-document=true" tabindex="0" role="treeitem">
+      <span class="tree-toggle spacer" aria-hidden="true"></span>
+      <span class="tree-icon" th:text="${node.icon}"></span>
+      <span class="node-label" th:text="${node.name}"></span>
+      <span class="empty-badge" th:if="${node.empty}">empty</span>
+    </a>
+  </li>
+  <li class="tree-item folder-node collapsed" th:unless="${node.document}" th:attr="data-id=${node.id},data-relative-path=${node.relativePath}">
+    <button type="button" class="tree-row folder-row" tabindex="0" aria-expanded="false">
+      <span class="tree-toggle" aria-hidden="true"><span class="tree-caret">▶</span></span>
+      <span class="tree-icon">📁</span>
+      <span class="node-label" th:text="${node.name}"></span>
+    </button>
+    <ul class="tree-level folder-children">
+      <th:block th:each="child : ${node.children}">
+        <th:block th:replace="~{treeNode :: treeNode(node=${child})}"></th:block>
+      </th:block>
+    </ul>
+  </li>
+</th:block>
+</body>
+</html>
