@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moyludoc Admin</title>
+  <link rel="stylesheet" href="/browser.css">
+</head>
+<body>
+<div class="app-shell">
+  <div class="app-topbar">
+    <div>
+      <h1>Moyludoc Admin</h1>
+      <div class="upload-target">Configure cached tree settings separately from the library browser.</div>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <div class="admin-tab-list" role="tablist" aria-label="Admin tabs">
+      <button class="admin-tab active" type="button" role="tab" aria-selected="true" data-tab="general-settings">General settings</button>
+    </div>
+
+    <section class="admin-tab-panel active" id="general-settings" role="tabpanel">
+      <div class="admin-card">
+        <h2>General settings</h2>
+        <form method="get" action="/api/docx/library/admin" class="admin-form">
+          <label class="admin-label" for="root">Root folder</label>
+          <input class="admin-input" id="root" name="root" type="text" th:value="${root}" placeholder="/path/to/root/folder">
+
+          <label class="admin-checkbox">
+            <input type="checkbox" name="reload" value="true" th:checked="${reload}">
+            <span>Reload tree in background</span>
+          </label>
+
+          <div class="admin-actions">
+            <button class="upload-btn" type="submit">Apply settings</button>
+            <a class="admin-link" th:href="@{/api/docx/library/browser(root=${root})}">Open library browser</a>
+          </div>
+        </form>
+
+        <div class="admin-meta">
+          <div><strong>Current root:</strong> <span th:text="${root}">docs-library</span></div>
+          <div><strong>Reload requested:</strong> <span th:text="${reload} ? 'yes' : 'no'">no</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="app-footer">© 2026 Fakher Hammami · <a href="mailto:hfekher@gmail.com">hfekher@gmail.com</a></footer>
+</div>
+<script>
+  document.querySelectorAll('.admin-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.admin-tab').forEach(t=>{t.classList.remove('active');t.setAttribute('aria-selected','false')});
+      document.querySelectorAll('.admin-tab-panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected','true');
+      const panel=document.getElementById(tab.dataset.tab);
+      if(panel)panel.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

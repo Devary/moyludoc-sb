@@ -53,23 +53,51 @@ public class DocumentLibraryController {
     }
 
     @GetMapping("/tree")
-    public ResponseEntity<DocumentLibraryService.DocumentTreeNode> tree() { return ResponseEntity.ok(documentLibraryService.loadTree()); }
+    public ResponseEntity<DocumentLibraryService.DocumentTreeNode> tree(@RequestParam(required = false) String root, @RequestParam(required = false, defaultValue = "false") boolean reload) {
+        return ResponseEntity.ok(reload ? documentLibraryService.reloadTreeInBackground(root) : documentLibraryService.loadTree(root));
+    }
+
+    @GetMapping("/tree/browser-data")
+    public ResponseEntity<DocumentLibraryHtmlService.BrowserNode> browserTree(@RequestParam(required = false) String root) {
+        return ResponseEntity.ok(documentLibraryHtmlService.toBrowserNode(documentLibraryService.loadTree(root)));
+    }
+
+    @GetMapping("/tree/status")
+    public ResponseEntity<DocumentLibraryService.TreeReloadStatus> treeStatus(@RequestParam(required = false) String root) {
+        return ResponseEntity.ok(documentLibraryService.treeReloadStatus(root));
+    }
 
     @GetMapping("/children")
-    public ResponseEntity<java.util.List<DocumentLibraryService.DocumentTreeNode>> children(@RequestParam(required = false) String id) { return ResponseEntity.ok(documentLibraryService.loadChildren(id)); }
+    public ResponseEntity<java.util.List<DocumentLibraryService.DocumentTreeNode>> children(@RequestParam(required = false) String id, @RequestParam(required = false) String root) {
+        return ResponseEntity.ok(documentLibraryService.loadChildren(id, root));
+    }
 
     @GetMapping("/browser")
-    public String browser(Model model) {
-        model.addAttribute("tree", documentLibraryHtmlService.toBrowserNode(documentLibraryService.loadTree()));
+    public String browser(@RequestParam(required = false) String root, Model model) {
+        var tree = documentLibraryService.loadTree(root);
+        Path rootPath = documentLibraryService.libraryRootPath(root);
+        model.addAttribute("tree", documentLibraryHtmlService.toBrowserNode(tree));
+        model.addAttribute("root", rootPath.toString());
         return "browser";
     }
 
+    @GetMapping("/admin")
+    public String admin(@RequestParam(required = false) String root, @RequestParam(required = false, defaultValue = "false") boolean reload, Model model) {
+        Path rootPath = documentLibraryService.libraryRootPath(root);
+        if (reload) {
+            documentLibraryService.reloadTreeInBackground(rootPath.toString());
+        }
+        model.addAttribute("root", rootPath.toString());
+        model.addAttribute("reload", reload);
+        return "admin";
+    }
+
     @GetMapping("/document/extract")
-    public ResponseEntity<Object> extract(@RequestParam String id) { return ResponseEntity.ok(extractStored(readDocument(id))); }
+    public ResponseEntity<Object> extract(@RequestParam String id, @RequestParam(required = false) String root) { return ResponseEntity.ok(extractStored(readDocument(id, root))); }
 
     @GetMapping(value = "/document/preview", produces = MediaType.TEXT_HTML_VALUE)
-    public String preview(@RequestParam String id, Model model) {
-        var stored = readDocument(id);
+    public String preview(@RequestParam String id, @RequestParam(required = false) String root, Model model) {
+        var stored = readDocument(id, root);
         if (stored.empty()) { model.addAttribute("title", stored.name()); model.addAttribute("fileType", stored.fileType()); return "preview-empty"; }
         try {
             Object extracted = extractStoredCached(stored);
@@ -100,14 +128,14 @@ public class DocumentLibraryController {
     private String renderInline(String html, Model model) { model.addAttribute("renderedHtml", html); return "inline-rendered"; }
 
     @GetMapping("/document/meta")
-    public ResponseEntity<DocumentMeta> meta(@RequestParam String id) {
-        DocumentLibraryService.StoredDocument stored = readDocument(id);
-        return ResponseEntity.ok(new DocumentMeta(stored.name(), documentLibraryService.breadcrumbsById(id), stored.fileType(), stored.empty(), stored.sizeInBytes()));
+    public ResponseEntity<DocumentMeta> meta(@RequestParam String id, @RequestParam(required = false) String root) {
+        DocumentLibraryService.StoredDocument stored = readDocument(id, root);
+        return ResponseEntity.ok(new DocumentMeta(stored.name(), documentLibraryService.breadcrumbsById(id, root), stored.fileType(), stored.empty(), stored.sizeInBytes()));
     }
 
     @GetMapping("/document/download")
-    public ResponseEntity<byte[]> download(@RequestParam String id) {
-        DocumentLibraryService.StoredDocument stored = readDocument(id);
+    public ResponseEntity<byte[]> download(@RequestParam String id, @RequestParam(required = false) String root) {
+        DocumentLibraryService.StoredDocument stored = readDocument(id, root);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(stored.name()).build().toString())
                 .contentType(MediaType.parseMediaType(resolveMediaType(stored.fileType())))
@@ -115,17 +143,18 @@ public class DocumentLibraryController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<UploadResponse> upload(@RequestParam("file") MultipartFile file, @RequestParam(value = "folderId", required = false) String folderId) {
+    public ResponseEntity<UploadResponse> upload(@RequestParam("file") MultipartFile file, @RequestParam(value = "folderId", required = false) String folderId, @RequestParam(value = "root", required = false) String root) {
         if (file == null || file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A file is required");
         String targetFolder = folderId == null || folderId.isBlank() ? "" : folderId;
         try {
-            Path libraryRoot = documentLibraryService.libraryRootPath();
+            Path libraryRoot = documentLibraryService.libraryRootPath(root);
             Path folder = targetFolder.isBlank() ? libraryRoot : libraryRoot.resolve(Path.of(new String(Base64.getUrlDecoder().decode(targetFolder)))).normalize();
             Files.createDirectories(folder);
             Path destination = folder.resolve(file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename()).normalize();
             if (!destination.startsWith(libraryRoot)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid target folder");
             Files.copy(file.getInputStream(), destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             documentExtractionCacheService.invalidate(destination);
+            documentLibraryService.invalidateTree(root);
             String newId = Base64.getUrlEncoder().withoutPadding().encodeToString(libraryRoot.relativize(destination).toString().getBytes());
             return ResponseEntity.ok(new UploadResponse(destination.getFileName().toString(), newId));
         } catch (IOException e) {
@@ -149,9 +178,9 @@ public class DocumentLibraryController {
         });
     }
 
-    private DocumentLibraryService.StoredDocument readDocument(String id) {
+    private DocumentLibraryService.StoredDocument readDocument(String id, String root) {
         if (id == null || id.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document id is required");
-        try { return documentLibraryService.loadDocument(id); } catch (IllegalArgumentException e) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e); }
+        try { return documentLibraryService.loadDocument(id, root); } catch (IllegalArgumentException e) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e); }
     }
 
     private String resolveMediaType(String fileType) {

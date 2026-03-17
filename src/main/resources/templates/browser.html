@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/browser.css">
 </head>
 <body>
-<div class="app-shell">
+<div class="app-shell" th:attr="data-root=${root}">
   <div class="app-topbar">
     <div><h1>Moyludoc Library</h1></div>
     <div class="viewer-actions">
@@ -20,6 +20,7 @@
     <aside class="sidebar-column">
       <div class="sidebar-card">
         <div class="sidebar-title">Documents</div>
+        <div id="treeLiveStatus" class="upload-target hidden">Live reload in progress…</div>
         <div class="toolbar-row">
           <div class="upload-target">Upload to: <span id="uploadTargetPath">Library root</span></div>
           <label class="upload-btn"><input id="uploadInput" type="file" multiple><span id="uploadLabel">Upload files</span></label>
